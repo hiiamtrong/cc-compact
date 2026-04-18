@@ -47,8 +47,8 @@ def test_install_symlinked_hook_runs_end_to_end(tmp_path):
         input=payload, capture_output=True, text=True, cwd=tmp_path,
     )
     assert result.returncode == 0, result.stderr
-    out = json.loads(result.stdout)
-    assert out["hookSpecificOutput"]["hookEventName"] == "PreCompact"
+    # PreCompact stdout must be `{}`; the real proof of work is the memory file.
+    assert json.loads(result.stdout) == {}
     assert (tmp_path / ".claude/compact-memory/symlink-smoke.md").exists()
 
 

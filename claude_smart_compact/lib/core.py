@@ -88,19 +88,6 @@ def compose_memory_markdown(
     )
 
 
-def compaction_instructions() -> str:
-    """Custom instructions injected via PreCompact `additionalContext`."""
-    return (
-        "When summarizing, preserve: "
-        "(1) the last user message verbatim, "
-        "(2) any in_progress todos with their exact wording, "
-        "(3) any stated user preferences or constraints. "
-        "A structured memory file at "
-        "`.claude/compact-memory/<session_id>.md` "
-        "is also persisted for reference."
-    )
-
-
 def prompt_pointer_text(session_id: str, memory_size_bytes: int) -> str:
     """Pointer injected via UserPromptSubmit `additionalContext`."""
     size_kb = max(1, round(memory_size_bytes / 1024))

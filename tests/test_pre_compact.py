@@ -29,10 +29,8 @@ def test_pre_compact_happy_path(project_root, fixtures_dir):
     }
     result = _run_hook("pre_compact.py", payload, project_root)
     assert result.returncode == 0, result.stderr
-    out = json.loads(result.stdout)
-    assert "hookSpecificOutput" in out
-    assert out["hookSpecificOutput"]["hookEventName"] == "PreCompact"
-    assert "additionalContext" in out["hookSpecificOutput"]
+    # PreCompact stdout must be `{}` — Claude Code rejects any other shape.
+    assert json.loads(result.stdout) == {}
 
     mem = project_root / ".claude" / "compact-memory" / "sid-happy.md"
     assert mem.exists()

@@ -70,12 +70,10 @@ def main() -> None:
         "preserved_preferences": existing_prefs is not None,
     })
 
-    json.dump({
-        "hookSpecificOutput": {
-            "hookEventName": "PreCompact",
-            "additionalContext": core.compaction_instructions(),
-        }
-    }, sys.stdout)
+    # PreCompact stdout must be empty: Claude Code's schema does not accept
+    # `hookSpecificOutput` for PreCompact. Compaction guidance rides the
+    # UserPromptSubmit pointer on the next turn instead.
+    json.dump({}, sys.stdout)
 
 
 if __name__ == "__main__":
