@@ -47,7 +47,7 @@ def install(project_dir: Path, force: bool) -> int:
             print("\nNext step: merge the following into .claude/settings.json:\n")
             print(SETTINGS_SNIPPET)
             return 0
-    shutil.copytree(lib_src, lib_dst)
+    shutil.copytree(lib_src, lib_dst, ignore=shutil.ignore_patterns("__pycache__"))
     print(f"installed: {lib_dst}/")
 
     print("\nNext step: merge the following into .claude/settings.json:\n")

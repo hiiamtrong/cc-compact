@@ -36,6 +36,12 @@ def test_install_force_overwrites(tmp_path):
     assert "PreCompact" in pre.read_text()
 
 
+def test_install_skips_pycache(tmp_path):
+    cli.install(tmp_path, force=False)
+    lib_dst = tmp_path / ".claude/hooks/lib"
+    assert not (lib_dst / "__pycache__").exists()
+
+
 def test_installed_hook_runs_end_to_end(tmp_path):
     """Smoke test: install, then invoke the deployed hook with a valid payload."""
     cli.install(tmp_path, force=False)
