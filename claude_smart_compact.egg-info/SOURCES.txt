@@ -1,0 +1,6 @@
+pyproject.toml
+claude_smart_compact.egg-info/PKG-INFO
+claude_smart_compact.egg-info/SOURCES.txt
+claude_smart_compact.egg-info/dependency_links.txt
+claude_smart_compact.egg-info/requires.txt
+claude_smart_compact.egg-info/top_level.txt
