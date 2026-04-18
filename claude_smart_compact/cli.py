@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import shutil
 import sys
 from pathlib import Path
@@ -13,7 +14,9 @@ from . import __version__
 PACKAGE_DIR = Path(__file__).resolve().parent
 HOOK_FILES = ("pre_compact.py", "user_prompt.py")
 LIB_DIR = "lib"
+IS_WINDOWS = platform.system() == "Windows"
 
+# Keep the snippet printed when --no-settings is used.
 SETTINGS_SNIPPET = """{
   "hooks": {
     "PreCompact": [
@@ -75,7 +78,44 @@ def _merge_settings(project_dir: Path) -> int:
     return 0
 
 
-def install(project_dir: Path, force: bool, write_settings: bool = True) -> int:
+def _remove_existing(path: Path) -> None:
+    """Remove a path whether it's a file, directory, or symlink (including dangling)."""
+    if path.is_symlink() or path.exists():
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
+
+
+def _install_link(project_dir: Path, force: bool) -> int:
+    """Install hooks as symlinks pointing to the installed package."""
+    target = project_dir / ".claude" / "hooks"
+    target.mkdir(parents=True, exist_ok=True)
+    for name in HOOK_FILES:
+        src = PACKAGE_DIR / name
+        dst = target / name
+        if dst.is_symlink() or dst.exists():
+            if not force:
+                print(f"skip: {dst} already exists (use --force to overwrite)", file=sys.stderr)
+                continue
+            _remove_existing(dst)
+        os.symlink(src, dst)
+        print(f"linked: {dst} -> {src}")
+
+    lib_src = PACKAGE_DIR / LIB_DIR
+    lib_dst = target / LIB_DIR
+    if lib_dst.is_symlink() or lib_dst.exists():
+        if not force:
+            print(f"skip: {lib_dst} already exists (use --force to overwrite)", file=sys.stderr)
+            return 0
+        _remove_existing(lib_dst)
+    os.symlink(lib_src, lib_dst, target_is_directory=True)
+    print(f"linked: {lib_dst}/ -> {lib_src}/")
+    return 0
+
+
+def _install_copy(project_dir: Path, force: bool) -> int:
+    """Install hooks by copying files (portable fallback; what install used to do)."""
     target = project_dir / ".claude" / "hooks"
     target.mkdir(parents=True, exist_ok=True)
 
@@ -85,23 +125,39 @@ def install(project_dir: Path, force: bool, write_settings: bool = True) -> int:
         if dst.exists() and not force:
             print(f"skip: {dst} already exists (use --force to overwrite)", file=sys.stderr)
             continue
+        _remove_existing(dst)
         shutil.copy2(src, dst)
         print(f"installed: {dst}")
 
     lib_src = PACKAGE_DIR / LIB_DIR
     lib_dst = target / LIB_DIR
-    if lib_dst.exists():
-        if force:
-            shutil.rmtree(lib_dst)
-        else:
+    if lib_dst.exists() or lib_dst.is_symlink():
+        if not force:
             print(f"skip: {lib_dst} already exists (use --force to overwrite)", file=sys.stderr)
-            if not write_settings:
-                print("\nNext step: merge the following into .claude/settings.json:\n")
-                print(SETTINGS_SNIPPET)
-                return 0
-            return _merge_settings(project_dir)
+            return 0
+        _remove_existing(lib_dst)
     shutil.copytree(lib_src, lib_dst, ignore=shutil.ignore_patterns("__pycache__"))
     print(f"installed: {lib_dst}/")
+    return 0
+
+
+def install(project_dir: Path, force: bool, write_settings: bool = True, use_symlink: bool = True) -> int:
+    """Install hooks into <project>/.claude/hooks/.
+
+    use_symlink=True: symlinks into the installed package (default). Auto-upgrades with `pip install -U`.
+    use_symlink=False: copies files (portable, needs --force to re-deploy after package upgrade).
+    """
+    # Windows auto-fallback.
+    if use_symlink and IS_WINDOWS:
+        print("note: symlinks unavailable on Windows without admin, using copy mode", file=sys.stderr)
+        use_symlink = False
+
+    if use_symlink:
+        rc = _install_link(project_dir, force)
+    else:
+        rc = _install_copy(project_dir, force)
+    if rc != 0:
+        return rc
 
     if not write_settings:
         print("\nNext step: merge the following into .claude/settings.json:\n")
@@ -118,16 +174,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
-    inst = sub.add_parser("install", help="Copy hooks into <project>/.claude/hooks/")
+    inst = sub.add_parser("install", help="Install hooks into <project>/.claude/hooks/")
     inst.add_argument("--dir", type=Path, default=Path.cwd(),
                       help="Project directory (default: current directory)")
     inst.add_argument("--force", action="store_true",
-                      help="Overwrite existing files")
+                      help="Overwrite existing files / symlinks")
     inst.add_argument("--no-settings", dest="write_settings", action="store_false", default=True,
                       help="Skip automatic settings.json merge")
+    inst.add_argument("--copy", dest="use_symlink", action="store_false", default=True,
+                      help="Copy files instead of symlinking (portable but doesn't auto-update on package upgrade)")
     args = parser.parse_args(argv)
     if args.command == "install":
-        return install(args.dir, args.force, args.write_settings)
+        return install(args.dir, args.force, args.write_settings, args.use_symlink)
     return 1
 
 

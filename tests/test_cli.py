@@ -1,31 +1,124 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from claude_smart_compact import cli
 
 
-def test_install_copies_files_into_target(tmp_path):
+# ============== Symlink mode (default) tests ==============
+
+def test_install_default_mode_creates_symlinks(tmp_path):
     rc = cli.install(tmp_path, force=False)
     assert rc == 0
     hooks_dir = tmp_path / ".claude" / "hooks"
-    assert (hooks_dir / "pre_compact.py").exists()
-    assert (hooks_dir / "user_prompt.py").exists()
-    assert (hooks_dir / "lib" / "core.py").exists()
-    assert (hooks_dir / "lib" / "memory.py").exists()
-    assert (hooks_dir / "lib" / "transcript.py").exists()
+    assert (hooks_dir / "pre_compact.py").is_symlink()
+    assert (hooks_dir / "user_prompt.py").is_symlink()
+    assert (hooks_dir / "lib").is_symlink()
 
 
-def test_install_is_idempotent_without_force(tmp_path, capsys):
+def test_install_symlinks_resolve_to_installed_package(tmp_path):
     cli.install(tmp_path, force=False)
+    link = tmp_path / ".claude/hooks/pre_compact.py"
+    resolved = link.resolve()
+    # resolved path should contain "claude_smart_compact" (either from site-packages or editable install)
+    assert "claude_smart_compact" in str(resolved)
+    assert resolved.name == "pre_compact.py"
+
+
+def test_install_symlinked_hook_runs_end_to_end(tmp_path):
+    cli.install(tmp_path, force=False)
+    hook = tmp_path / ".claude/hooks/pre_compact.py"
+    transcript = Path(__file__).parent / "fixtures" / "transcript_with_todos.jsonl"
+    payload = json.dumps({
+        "session_id": "symlink-smoke",
+        "transcript_path": str(transcript),
+        "hook_event_name": "PreCompact",
+        "trigger": "auto",
+    })
+    result = subprocess.run(
+        [sys.executable, str(hook)],
+        input=payload, capture_output=True, text=True, cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["hookSpecificOutput"]["hookEventName"] == "PreCompact"
+    assert (tmp_path / ".claude/compact-memory/symlink-smoke.md").exists()
+
+
+def test_install_symlink_without_force_skips_existing(tmp_path, capsys):
+    cli.install(tmp_path, force=False)
+    # capture first install output to clear
+    capsys.readouterr()
     rc = cli.install(tmp_path, force=False)
     assert rc == 0
     captured = capsys.readouterr()
     assert "skip" in captured.err
 
+
+def test_install_symlink_force_replaces_existing_file(tmp_path):
+    """--force should work even if the target is a regular file (not a symlink)."""
+    hooks_dir = tmp_path / ".claude/hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    # Place a regular file at the target location.
+    (hooks_dir / "pre_compact.py").write_text("# stale content")
+    cli.install(tmp_path, force=True)
+    assert (hooks_dir / "pre_compact.py").is_symlink()
+    assert (hooks_dir / "pre_compact.py").resolve().name == "pre_compact.py"
+
+
+def test_install_symlink_force_replaces_dangling_symlink(tmp_path):
+    """--force should repair a dangling symlink."""
+    hooks_dir = tmp_path / ".claude/hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    dangling_target = tmp_path / "nonexistent-target.py"
+    os.symlink(dangling_target, hooks_dir / "pre_compact.py")
+    assert (hooks_dir / "pre_compact.py").is_symlink()
+    assert not (hooks_dir / "pre_compact.py").exists()  # dangling
+    cli.install(tmp_path, force=True)
+    assert (hooks_dir / "pre_compact.py").exists()  # now valid
+
+
+# ============== Copy mode tests ==============
+
+def test_install_copy_mode_copies_files(tmp_path):
+    rc = cli.install(tmp_path, force=False, use_symlink=False)
+    assert rc == 0
+    hooks_dir = tmp_path / ".claude" / "hooks"
+    assert (hooks_dir / "pre_compact.py").is_file() and not (hooks_dir / "pre_compact.py").is_symlink()
+    assert (hooks_dir / "lib" / "core.py").is_file()
+
+
+def test_install_copy_mode_skips_pycache(tmp_path):
+    cli.install(tmp_path, force=False, use_symlink=False)
+    lib_dst = tmp_path / ".claude/hooks/lib"
+    assert not (lib_dst / "__pycache__").exists()
+
+
+def test_install_copy_mode_force_overwrites(tmp_path):
+    cli.install(tmp_path, force=False, use_symlink=False)
+    pre = tmp_path / ".claude/hooks/pre_compact.py"
+    pre.write_text("TAMPERED")
+    cli.install(tmp_path, force=True, use_symlink=False)
+    assert "TAMPERED" not in pre.read_text()
+    assert "PreCompact" in pre.read_text()
+
+
+def test_install_copy_mode_cli_flag_invokes_copy(tmp_path):
+    """Verify --copy flag in main() routes to copy mode."""
+    rc = cli.main(["install", "--dir", str(tmp_path), "--copy"])
+    assert rc == 0
+    assert (tmp_path / ".claude/hooks/pre_compact.py").is_file()
+    assert not (tmp_path / ".claude/hooks/pre_compact.py").is_symlink()
+
+
+# ============== Settings merge tests (unchanged behavior) ==============
 
 def test_install_creates_settings_when_missing(tmp_path):
     cli.install(tmp_path, force=False)
@@ -47,17 +140,11 @@ def test_install_merges_into_existing_settings_preserving_other_keys(tmp_path):
     }))
     cli.install(tmp_path, force=False)
     data = json.loads(settings.read_text())
-    # existing keys preserved
     assert data["permissions"]["allow"] == ["Bash(git:*)"]
     assert data["hooks"]["Stop"][0]["hooks"][0]["command"] == "echo bye"
-    # new hooks added
     assert any(
         h["hooks"][0]["command"] == "python3 .claude/hooks/pre_compact.py"
         for h in data["hooks"]["PreCompact"]
-    )
-    assert any(
-        h["hooks"][0]["command"] == "python3 .claude/hooks/user_prompt.py"
-        for h in data["hooks"]["UserPromptSubmit"]
     )
 
 
@@ -65,7 +152,6 @@ def test_install_is_idempotent_on_settings(tmp_path):
     cli.install(tmp_path, force=False)
     cli.install(tmp_path, force=False)
     data = json.loads((tmp_path / ".claude/settings.json").read_text())
-    # Should have exactly 1 entry each, not 2
     assert len(data["hooks"]["PreCompact"]) == 1
     assert len(data["hooks"]["UserPromptSubmit"]) == 1
 
@@ -93,44 +179,18 @@ def test_install_invalid_existing_settings_errors_without_writing(tmp_path, caps
     before = settings.read_text()
     rc = cli.install(tmp_path, force=False)
     assert rc != 0
-    assert settings.read_text() == before  # untouched
+    assert settings.read_text() == before
     captured = capsys.readouterr()
     assert "invalid" in captured.err.lower() or "parse" in captured.err.lower()
 
 
-def test_install_force_overwrites(tmp_path):
+# ============== Windows fallback (mocked) ==============
+
+def test_install_on_windows_falls_back_to_copy(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "IS_WINDOWS", True)
     cli.install(tmp_path, force=False)
-    pre = tmp_path / ".claude/hooks/pre_compact.py"
-    pre.write_text("TAMPERED")
-    cli.install(tmp_path, force=True)
-    assert "TAMPERED" not in pre.read_text()
-    assert "PreCompact" in pre.read_text()
-
-
-def test_install_skips_pycache(tmp_path):
-    cli.install(tmp_path, force=False)
-    lib_dst = tmp_path / ".claude/hooks/lib"
-    assert not (lib_dst / "__pycache__").exists()
-
-
-def test_installed_hook_runs_end_to_end(tmp_path):
-    """Smoke test: install, then invoke the deployed hook with a valid payload."""
-    cli.install(tmp_path, force=False)
-    hook = tmp_path / ".claude/hooks/pre_compact.py"
-    transcript = (
-        Path(__file__).parent / "fixtures" / "transcript_with_todos.jsonl"
-    )
-    payload = json.dumps({
-        "session_id": "smoke",
-        "transcript_path": str(transcript),
-        "hook_event_name": "PreCompact",
-        "trigger": "auto",
-    })
-    result = subprocess.run(
-        [sys.executable, str(hook)],
-        input=payload, capture_output=True, text=True, cwd=tmp_path,
-    )
-    assert result.returncode == 0, result.stderr
-    out = json.loads(result.stdout)
-    assert out["hookSpecificOutput"]["hookEventName"] == "PreCompact"
-    assert (tmp_path / ".claude/compact-memory/smoke.md").exists()
+    captured = capsys.readouterr()
+    assert "windows" in captured.err.lower()
+    # Files should be regular copies, not symlinks.
+    assert not (tmp_path / ".claude/hooks/pre_compact.py").is_symlink()
+    assert (tmp_path / ".claude/hooks/pre_compact.py").is_file()

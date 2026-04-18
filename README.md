@@ -29,6 +29,26 @@ claude-smart-compact install
 The installer automatically creates or updates `.claude/settings.json` with the required hook entries,
 preserving any existing configuration. To skip this and manage `settings.json` manually, pass `--no-settings`.
 
+### Upgrading
+
+`claude-smart-compact install` creates symbolic links into the installed
+package by default. After upgrading the package, your hooks in every
+project are automatically up-to-date — no need to re-run `install` per
+project:
+
+```bash
+pipx upgrade claude-smart-compact   # or: pip install -U claude-smart-compact
+```
+
+If you prefer to copy files (e.g., for portability across machines without
+the package installed), use `--copy`:
+
+```bash
+claude-smart-compact install --copy   # needs --force to redeploy after upgrades
+```
+
+Windows falls back to `--copy` automatically (symlinks require admin rights).
+
 ### Manual (without pip)
 
 If you prefer not to pip install, copy `claude_smart_compact/` into
