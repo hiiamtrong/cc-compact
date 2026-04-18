@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
@@ -9,6 +10,46 @@ from typing import Literal, Optional
 Role = Literal["user", "assistant", "system", "tool"]
 
 VALID_ROLES = {"user", "assistant", "system", "tool"}
+
+# Slash commands that are META (session management, CLI control) — not task statements.
+# Custom / project-specific slash commands are intentionally NOT listed here.
+SLASH_COMMAND_SKIP_PREFIXES = (
+    "/compact",
+    "/clear",
+    "/cost",
+    "/context",
+    "/status",
+    "/help",
+    "/memory",
+    "/init",
+    "/logout",
+    "/login",
+    "/model",
+    "/review",
+    "/config",
+    "/bug",
+    "/release-notes",
+    "/doctor",
+    "/pr",
+    "/terminal-setup",
+    "/mcp",
+    "/permissions",
+    "/hooks",
+    "/ide",
+)
+
+_SLASH_CMD_RE = re.compile(r"<command-name>(/[a-zA-Z0-9_-]+)</command-name>")
+
+
+def _extract_slash_command(content: str) -> str | None:
+    """Return the /name portion if `content` starts with a slash-command marker."""
+    if not content:
+        return None
+    stripped = content.lstrip()
+    if not stripped.startswith("<command-name>"):
+        return None
+    m = _SLASH_CMD_RE.match(stripped)
+    return m.group(1) if m else None
 
 
 @dataclass
@@ -85,10 +126,14 @@ def parse_jsonl(path: str) -> list[Message]:
 
 
 def find_last_user_index(messages: list[Message]) -> Optional[int]:
-    """Return index of last message with role='user', or None."""
+    """Return index of last role=user message, skipping meta slash commands."""
     for msg in reversed(messages):
-        if msg.role == "user":
-            return msg.index
+        if msg.role != "user":
+            continue
+        cmd = _extract_slash_command(msg.content)
+        if cmd in SLASH_COMMAND_SKIP_PREFIXES:
+            continue
+        return msg.index
     return None
 
 

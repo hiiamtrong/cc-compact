@@ -131,6 +131,38 @@ def test_pre_compact_on_real_cli_format(project_root, fixtures_dir):
     assert "understand auth" in content  # in_progress todo
 
 
+def test_pre_compact_skips_compact_slash_command(project_root, tmp_path):
+    """If the last user turn is /compact, hook should use the PREVIOUS user turn as active task."""
+    tx = tmp_path / "with-compact.jsonl"
+    tx.write_text(
+        '{"type":"user","message":{"role":"user","content":"refactor the service"},"uuid":"u1"}\n'
+        '{"type":"assistant","message":{"role":"assistant","content":"working..."},"uuid":"a1"}\n'
+        '{"type":"user","message":{"role":"user","content":"<command-name>/compact</command-name>\\n<command-message>compact</command-message>\\n<command-args></command-args>"},"uuid":"u2"}\n'
+    )
+    payload = {
+        "session_id": "compact-skip",
+        "transcript_path": str(tx),
+        "hook_event_name": "PreCompact",
+        "trigger": "auto",
+    }
+    result = subprocess.run(
+        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
+    )
+    assert result.returncode == 0, result.stderr
+    mem = project_root / ".claude/compact-memory/compact-skip.md"
+    assert mem.exists()
+    content = mem.read_text()
+    assert "refactor the service" in content
+    # The blockquoted active task line must be "refactor the service", not the /compact command.
+    # (The in-flight turn summary may still mention /compact — that's fine.)
+    import re as _re
+    quoted_lines = [ln for ln in content.splitlines() if ln.startswith("> ")]
+    assert quoted_lines, "No blockquoted active task line found"
+    assert quoted_lines[0] == "> refactor the service"
+    assert "<command-name>/compact</command-name>" not in quoted_lines[0]
+
+
 def test_pre_compact_trace_records_preserved_preferences_flag(project_root, fixtures_dir):
     mem_dir = project_root / ".claude" / "compact-memory"
     mem_dir.mkdir(parents=True, exist_ok=True)
