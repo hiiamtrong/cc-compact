@@ -268,3 +268,58 @@ def test_find_last_user_all_tool_results_returns_none():
         _tool_result_msg(1, has_toolUseResult=True, content_list=True),
     ]
     assert transcript.find_last_user_index(msgs) is None
+
+
+def test_find_last_user_skips_local_command_stdout():
+    raw = {"type": "user", "message": {"role": "user", "content": "<local-command-stdout>compact failed</local-command-stdout>"}}
+    msgs = [
+        transcript.Message(role="user", content="real task", raw={}, index=0),
+        transcript.Message(role="assistant", content="done", raw={}, index=1),
+        transcript.Message(
+            role="user",
+            content="<local-command-stdout>compact failed</local-command-stdout>",
+            raw=raw, index=2,
+        ),
+    ]
+    assert transcript.find_last_user_index(msgs) == 0
+
+
+def test_find_last_user_skips_local_command_caveat():
+    raw = {"type": "user", "message": {"role": "user", "content": "<local-command-caveat>note</local-command-caveat>"}}
+    msgs = [
+        transcript.Message(role="user", content="real task", raw={}, index=0),
+        transcript.Message(
+            role="user",
+            content="<local-command-caveat>note</local-command-caveat>",
+            raw=raw, index=1,
+        ),
+    ]
+    assert transcript.find_last_user_index(msgs) == 0
+
+
+def test_find_last_user_skips_local_command_with_leading_whitespace():
+    """Markers may have leading newlines/spaces — still detected."""
+    marker = "\n  <local-command-stdout>out</local-command-stdout>"
+    msgs = [
+        transcript.Message(role="user", content="real task", raw={}, index=0),
+        transcript.Message(
+            role="user",
+            content=marker,
+            raw={"message": {"role": "user", "content": marker}},
+            index=1,
+        ),
+    ]
+    assert transcript.find_last_user_index(msgs) == 0
+
+
+def test_find_last_user_keeps_user_text_that_quotes_a_marker():
+    """If the marker appears mid-message (not as a prefix), treat as real prompt."""
+    quote = "please explain what <local-command-stdout> means in docs"
+    msgs = [
+        transcript.Message(
+            role="user", content=quote,
+            raw={"message": {"role": "user", "content": quote}},
+            index=0,
+        ),
+    ]
+    assert transcript.find_last_user_index(msgs) == 0

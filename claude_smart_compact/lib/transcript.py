@@ -121,17 +121,23 @@ def parse_jsonl(path: str) -> list[Message]:
     return messages
 
 
-def _is_tool_result_message(msg: "Message") -> bool:
-    """True if this 'user' message is actually a tool-result envelope injected
-    by the CLI (not a real user prompt).
+# Markers that Claude Code uses to inject non-prompt text as user messages.
+_LOCAL_COMMAND_MARKERS = (
+    "<local-command-stdout>",
+    "<local-command-stderr>",
+    "<local-command-caveat>",
+)
 
-    Detection uses two orthogonal signals — message is a tool result if EITHER holds.
+
+def _is_cli_injected_message(msg: "Message") -> bool:
+    """True if this 'user' message is actually CLI-injected metadata
+    (tool results, command stdout, caveats) rather than a real user prompt.
     """
     raw = msg.raw
-    # Signal 1: top-level toolUseResult key (distinguishing CLI metadata).
+    # Signal 1: top-level toolUseResult key
     if isinstance(raw, dict) and "toolUseResult" in raw:
         return True
-    # Signal 2: message.content is a list and every block is a tool_result.
+    # Signal 2: content is a list of tool_result blocks only
     msg_obj = raw.get("message") if isinstance(raw, dict) else None
     content = None
     if isinstance(msg_obj, dict):
@@ -144,6 +150,11 @@ def _is_tool_result_message(msg: "Message") -> bool:
             for b in content
         ):
             return True
+    # Signal 3: plain-string content wrapped in local-command markers.
+    text = msg.content or ""
+    stripped = text.lstrip()
+    if any(stripped.startswith(marker) for marker in _LOCAL_COMMAND_MARKERS):
+        return True
     return False
 
 
@@ -157,7 +168,7 @@ def find_last_user_index(messages: list[Message]) -> Optional[int]:
     for msg in reversed(messages):
         if msg.role != "user":
             continue
-        if _is_tool_result_message(msg):
+        if _is_cli_injected_message(msg):
             continue
         args = _slash_command_args(msg.content)
         if args is None:

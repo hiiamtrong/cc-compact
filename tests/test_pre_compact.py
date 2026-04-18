@@ -223,6 +223,38 @@ def test_pre_compact_skips_tool_result_user_messages(project_root, tmp_path):
     assert "pre-commit passed" not in quoted_lines[0]
 
 
+def test_pre_compact_skips_local_command_stdout_user_messages(project_root, tmp_path):
+    """<local-command-stdout> envelopes injected as user turns must be skipped."""
+    tx = tmp_path / "local-cmd.jsonl"
+    tx.write_text(
+        '{"type":"user","message":{"role":"user","content":"write the crawler MVP"},"uuid":"u1"}\n'
+        '{"type":"assistant","message":{"role":"assistant","content":"done"},"uuid":"a1"}\n'
+        '{"type":"user","message":{"role":"user","content":"<local-command-stdout>hook crashed</local-command-stdout>"},"uuid":"u2"}\n'
+    )
+    payload = {
+        "session_id": "local-cmd-test",
+        "transcript_path": str(tx),
+        "hook_event_name": "PreCompact",
+        "trigger": "auto",
+    }
+    result = subprocess.run(
+        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
+    )
+    assert result.returncode == 0, result.stderr
+    mem = project_root / ".claude/compact-memory/local-cmd-test.md"
+    assert mem.exists()
+    content = mem.read_text()
+    # The real task should be the Active Task, not the injected stdout.
+    # Check the blockquote line specifically.
+    active_task_line = next(
+        line for line in content.splitlines()
+        if line.startswith("> ") and not line.startswith("> _")
+    )
+    assert "write the crawler MVP" in active_task_line
+    assert "hook crashed" not in active_task_line
+
+
 def test_pre_compact_trace_records_preserved_preferences_flag(project_root, fixtures_dir):
     mem_dir = project_root / ".claude" / "compact-memory"
     mem_dir.mkdir(parents=True, exist_ok=True)
