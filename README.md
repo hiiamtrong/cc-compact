@@ -16,12 +16,32 @@ user preferences across auto-compaction, without bloating the context window.
   section on every run, but does not populate it automatically. Append with
   the Edit tool when the user states a lasting preference.
 
-## Install (per project)
+## Install
 
-1. Copy `hooks/` into your project's `.claude/hooks/`.
-2. Copy `.claude/settings.json.example` to `.claude/settings.json`
-   (or merge into your existing settings).
-3. Make sure `python3` is on your `$PATH`.
+From PyPI:
+
+```bash
+pip install claude-smart-compact
+cd /path/to/your/project
+claude-smart-compact install
+```
+
+Then merge the printed snippet into `.claude/settings.json` (or create the file with it).
+
+### Manual (without pip)
+
+If you prefer not to pip install, copy `claude_smart_compact/` into
+your project's `.claude/hooks/` directly. The deployed layout is:
+
+```text
+<project>/.claude/hooks/
+├── pre_compact.py
+├── user_prompt.py
+└── lib/
+    ├── core.py
+    ├── memory.py
+    └── transcript.py
+```
 
 ## Verify
 
