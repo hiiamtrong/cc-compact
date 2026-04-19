@@ -64,8 +64,10 @@ def _collapse_duplicates(bullets: list[str]) -> list[str]:
 def _render_in_flight(in_flight: list[Message]) -> str:
     bullets: list[str] = []
     for msg in in_flight:
-        # Skip CLI-injected user messages (they're noise in the timeline).
-        if msg.role == "user" and is_skippable_user_turn(msg):
+        # User turns: the anchor prompt is already quoted in `## Active Task`
+        # above, and CLI-injected envelopes (tool_result, local-command) are
+        # noise. Either way, skip — keep bullets focused on assistant activity.
+        if msg.role == "user":
             continue
         first_line = next(
             (ln for ln in (msg.content or "").splitlines() if ln.strip()), ""
