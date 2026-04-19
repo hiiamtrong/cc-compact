@@ -43,3 +43,6 @@ cc_compact = ["*.py"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--tb=short"
+markers = [
+    "slow: tests that generate multi-MB fixtures or shell out many times",
+]

@@ -190,8 +190,9 @@ def test_compose_renders_multiline_bash_first_line_only():
     assert "echo b" not in md
 
 
-def test_render_in_flight_filters_cli_injected_user_turns():
-    """In-flight rendering should drop CLI-injected bullets (local-command, tool-result, /compact)."""
+def test_render_in_flight_filters_all_user_turns():
+    """In-flight bullets focus on assistant activity: user turns are skipped
+    (the anchor prompt is in Active Task, envelopes are noise)."""
     # Real assistant turn (keep)
     m1 = Message(role="assistant", content="looking at the code", raw={}, index=1)
     # /compact meta (drop)
@@ -218,7 +219,7 @@ def test_render_in_flight_filters_cli_injected_user_turns():
         },
         index=4,
     )
-    # Normal user prompt (keep)
+    # Anchor user prompt (drop — already in Active Task)
     m5 = Message(role="user", content="please continue", raw={"message": {"role": "user", "content": "please continue"}}, index=5)
     md = core.compose_memory_markdown(
         session_id="sid",
@@ -228,10 +229,13 @@ def test_render_in_flight_filters_cli_injected_user_turns():
         existing_preferences_section=None,
     )
     assert "- looking at the code" in md
-    assert "- please continue" in md
-    assert "<command-name>" not in md  # filtered
-    assert "<local-command-stdout>" not in md  # filtered
-    assert "tool result output" not in md  # filtered
+    # All user-role content drops out of in-flight.
+    # (Active Task blockquote shows it instead — tested elsewhere.)
+    in_flight_section = md.split("**In-flight turns")[1].split("## Open Todos")[0]
+    assert "please continue" not in in_flight_section
+    assert "<command-name>" not in in_flight_section
+    assert "<local-command-stdout>" not in in_flight_section
+    assert "tool result output" not in in_flight_section
 
 
 def test_render_in_flight_caps_bullets_at_max():
@@ -248,8 +252,48 @@ def test_render_in_flight_no_truncation_marker_when_under_cap():
     assert "older in-flight turns trimmed" not in rendered
 
 
-def test_render_in_flight_keeps_slash_command_with_args():
-    """Slash commands WITH args carry task intent — keep them in bullets."""
+def test_render_in_flight_collapses_duplicate_bullets():
+    """Identical bullets (text or tool_use) collapse into one line tagged ×N."""
+    msgs = [_msg("assistant", "Reading file contents", i) for i in range(5)]
+    rendered = core._render_in_flight(msgs)
+    # Single bullet with count, not five separate lines.
+    assert rendered.count("Reading file contents") == 1
+    assert "(×5)" in rendered
+
+
+def test_render_in_flight_preserves_first_occurrence_order_after_dedup():
+    msgs = [
+        _msg("assistant", "A", 0),
+        _msg("assistant", "B", 1),
+        _msg("assistant", "A", 2),
+        _msg("assistant", "C", 3),
+        _msg("assistant", "B", 4),
+    ]
+    rendered = core._render_in_flight(msgs)
+    a_pos = rendered.index("- A")
+    b_pos = rendered.index("- B")
+    c_pos = rendered.index("- C")
+    assert a_pos < b_pos < c_pos
+    assert "- A (×2)" in rendered
+    assert "- B (×2)" in rendered
+    assert "- C" in rendered and "C (×" not in rendered
+
+
+def test_render_in_flight_trim_note_mentions_raw_turn_count_when_deduped():
+    """When dedup + trim both fire, the note should surface the raw turn count."""
+    # 40 unique bullets + 20 copies of one of them → 60 raw turns, 40 unique.
+    msgs = [_msg("assistant", f"turn {i}", i) for i in range(40)]
+    msgs += [_msg("assistant", "turn 0", 100 + i) for i in range(20)]
+    rendered = core._render_in_flight(msgs)
+    lines = rendered.split("\n")
+    # 40 unique > MAX_IN_FLIGHT (30) → trimmed_count = 10, and dedup happened.
+    assert "collapsed from 60 turns" in lines[0]
+    assert "10 older in-flight bullets trimmed" in lines[0]
+
+
+def test_render_in_flight_drops_slash_command_user_turn():
+    """Slash commands WITH args become the Active Task; in-flight bullets
+    should not duplicate them (all user-role turns are skipped there)."""
     m = Message(
         role="user",
         content="<command-name>/ultrareview</command-name>\n<command-args>fix nulls</command-args>",
@@ -258,10 +302,13 @@ def test_render_in_flight_keeps_slash_command_with_args():
     )
     md = core.compose_memory_markdown(
         session_id="sid",
-        active_task_user_msg="task",
+        active_task_user_msg="fix nulls",
         in_flight=[m],
         todos=[],
         existing_preferences_section=None,
     )
-    # Main assertion: it's NOT filtered out.
-    assert "ultrareview" in md or "<command-name>" in md  # content still rendered
+    in_flight_section = md.split("**In-flight turns")[1].split("## Open Todos")[0]
+    assert "ultrareview" not in in_flight_section
+    assert "<command-name>" not in in_flight_section
+    # Active Task still carries the real intent.
+    assert "> fix nulls" in md
