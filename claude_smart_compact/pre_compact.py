@@ -28,7 +28,8 @@ def main(payload: dict) -> None:
 
     root = memory.find_project_root(Path.cwd())
     messages = transcript.parse_jsonl(transcript_path)
-    last_user_idx = transcript.find_last_user_index(messages)
+    scan = transcript.scan_transcript(messages)
+    last_user_idx = scan.last_user_idx
 
     if last_user_idx is None:
         _safe_trace(root, session_id, {
@@ -41,11 +42,8 @@ def main(payload: dict) -> None:
         json.dump({}, sys.stdout)
         return
 
-    in_flight = transcript.slice_in_flight(messages, last_user_idx)
-    todos = [
-        t for t in transcript.extract_latest_todos(messages)
-        if t.status in ("in_progress", "pending")
-    ]
+    in_flight = scan.in_flight
+    todos = [t for t in scan.todos if t.status in ("in_progress", "pending")]
     active_task_msg = transcript.active_task_text(messages[last_user_idx]) if messages else ""
 
     mem_file = memory.memory_path(root, session_id)

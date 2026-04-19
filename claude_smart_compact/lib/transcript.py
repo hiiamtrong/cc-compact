@@ -213,27 +213,72 @@ def _message_content_blocks(msg: Message) -> list[dict]:
     return []
 
 
+def _has_todowrite_block(msg: Message) -> bool:
+    """True if msg has any TodoWrite tool_use block (even with empty todos list)."""
+    for block in _message_content_blocks(msg):
+        if block.get("type") == "tool_use" and block.get("name") == "TodoWrite":
+            return True
+    return False
+
+
+def _parse_todowrite_from_message(msg: Message) -> list[TodoItem]:
+    """Return parsed TodoItems from any TodoWrite tool_use blocks in msg.
+
+    Returns [] if msg has no TodoWrite block or its todos list is empty.
+    """
+    parsed: list[TodoItem] = []
+    for block in _message_content_blocks(msg):
+        if block.get("type") != "tool_use" or block.get("name") != "TodoWrite":
+            continue
+        input_val = block.get("input", {})
+        if not isinstance(input_val, dict):
+            continue
+        for t in input_val.get("todos", []):
+            if not isinstance(t, dict):
+                continue
+            content = t.get("content") or ""
+            status = t.get("status") or "pending"
+            if status not in ("pending", "in_progress", "completed"):
+                status = "pending"
+            parsed.append(TodoItem(content=content, status=status))
+    return parsed
+
+
 def extract_latest_todos(messages: list[Message]) -> list[TodoItem]:
     """Find the most recent TodoWrite tool_use call and parse its todo list."""
     latest: list[TodoItem] = []
     for msg in messages:
-        for block in _message_content_blocks(msg):
-            if block.get("type") != "tool_use":
-                continue
-            if block.get("name") != "TodoWrite":
-                continue
-            input_val = block.get("input", {})
-            if not isinstance(input_val, dict):
-                continue
-            todos_raw = input_val.get("todos", [])
-            parsed: list[TodoItem] = []
-            for t in todos_raw:
-                if not isinstance(t, dict):
-                    continue
-                content = t.get("content") or ""
-                status = t.get("status") or "pending"
-                if status not in ("pending", "in_progress", "completed"):
-                    status = "pending"
-                parsed.append(TodoItem(content=content, status=status))
-            latest = parsed  # later wins (empty list clears todos)
+        if _has_todowrite_block(msg):
+            latest = _parse_todowrite_from_message(msg)  # later wins (empty clears)
     return latest
+
+
+@dataclass
+class TranscriptScan:
+    last_user_idx: Optional[int]
+    in_flight: list[Message]
+    todos: list[TodoItem]
+
+
+def scan_transcript(messages: list[Message]) -> TranscriptScan:
+    """Single forward pass computing last_user_idx, in_flight, and todos.
+
+    Replaces three separate O(n) passes (find_last_user_index, slice_in_flight,
+    extract_latest_todos) with one.
+    """
+    last_user_idx: Optional[int] = None
+    in_flight_accum: list[Message] = []
+    todos: list[TodoItem] = []
+
+    for msg in messages:
+        if msg.role == "user" and not is_skippable_user_turn(msg):
+            last_user_idx = msg.index
+            in_flight_accum = [msg]
+        elif last_user_idx is not None:
+            in_flight_accum.append(msg)
+
+        if _has_todowrite_block(msg):
+            todos = _parse_todowrite_from_message(msg)  # later wins (empty clears)
+
+    in_flight = in_flight_accum if last_user_idx is not None else list(messages)
+    return TranscriptScan(last_user_idx=last_user_idx, in_flight=in_flight, todos=todos)

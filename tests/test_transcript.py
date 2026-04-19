@@ -394,3 +394,24 @@ def test_is_skippable_user_turn_on_task_slash_command():
 def test_is_skippable_user_turn_on_plain_user_text():
     msg = transcript.Message(role="user", content="just a prompt", raw={}, index=0)
     assert transcript.is_skippable_user_turn(msg) is False
+
+
+def test_scan_transcript_single_pass(copy_fixture):
+    # Empty list: no user index, empty in_flight, no todos.
+    empty = transcript.scan_transcript([])
+    assert empty.last_user_idx is None
+    assert empty.in_flight == []
+    assert empty.todos == []
+
+    # Real fixture: result must match the three old functions combined.
+    path = copy_fixture("transcript_with_todos.jsonl")
+    messages = transcript.parse_jsonl(str(path))
+    scan = transcript.scan_transcript(messages)
+
+    expected_idx = transcript.find_last_user_index(messages)
+    expected_in_flight = transcript.slice_in_flight(messages, expected_idx)
+    expected_todos = transcript.extract_latest_todos(messages)
+
+    assert scan.last_user_idx == expected_idx
+    assert [m.index for m in scan.in_flight] == [m.index for m in expected_in_flight]
+    assert scan.todos == expected_todos
