@@ -1,0 +1,21 @@
+{
+  "name": "cc-compact",
+  "version": "0.1.11",
+  "description": "Two Claude Code hooks that preserve task state, in-progress todos, and user preferences across auto-compaction — without bloating the context window.",
+  "author": {
+    "name": "hiiamtrong",
+    "email": "hiiamtrong@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/hiiamtrong/cc-compact",
+  "repository": "https://github.com/hiiamtrong/cc-compact",
+  "license": "MIT",
+  "keywords": [
+    "compaction",
+    "memory",
+    "hooks",
+    "context",
+    "todos",
+    "preferences"
+  ],
+  "hooks": "./hooks/hooks.json"
+}
