@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from claude_smart_compact.lib import memory
+from cc_compact.lib import memory
 
 
 def test_find_project_root_walks_up_to_claude_dir(tmp_path):

@@ -1,1 +1,1 @@
-../../claude_smart_compact/pre_compact.py
+../../cc_compact/pre_compact.py

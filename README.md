@@ -21,9 +21,9 @@ user preferences across auto-compaction, without bloating the context window.
 From PyPI:
 
 ```bash
-pip install claude-smart-compact
+pip install cc-compact
 cd /path/to/your/project
-claude-smart-compact install
+cc-compact install
 ```
 
 The installer automatically creates or updates `.claude/settings.json` with the required hook entries,
@@ -31,27 +31,27 @@ preserving any existing configuration. To skip this and manage `settings.json` m
 
 ### Upgrading
 
-`claude-smart-compact install` creates symbolic links into the installed
+`cc-compact install` creates symbolic links into the installed
 package by default. After upgrading the package, your hooks in every
 project are automatically up-to-date — no need to re-run `install` per
 project:
 
 ```bash
-pipx upgrade claude-smart-compact   # or: pip install -U claude-smart-compact
+pipx upgrade cc-compact   # or: pip install -U cc-compact
 ```
 
 If you prefer to copy files (e.g., for portability across machines without
 the package installed), use `--copy`:
 
 ```bash
-claude-smart-compact install --copy   # needs --force to redeploy after upgrades
+cc-compact install --copy   # needs --force to redeploy after upgrades
 ```
 
 Windows falls back to `--copy` automatically (symlinks require admin rights).
 
 ### Manual (without pip)
 
-If you prefer not to pip install, copy `claude_smart_compact/` into
+If you prefer not to pip install, copy `cc_compact/` into
 your project's `.claude/hooks/` directly. The deployed layout is:
 
 ```text
@@ -76,7 +76,7 @@ python3 tests/trace_run.py tests/fixtures/transcript_with_todos.jsonl
 
 ```bash
 pip install -e ".[dev]"
-pytest --cov=claude_smart_compact
+pytest --cov=cc_compact
 ```
 
 ## Debug

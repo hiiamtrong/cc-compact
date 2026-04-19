@@ -1,1 +1,1 @@
-../../claude_smart_compact/user_prompt.py
+../../cc_compact/user_prompt.py

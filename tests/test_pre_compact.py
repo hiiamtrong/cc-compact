@@ -11,7 +11,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 def _run_hook(script: str, payload: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / script)],
+        [sys.executable, str(REPO / "cc_compact" / script)],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
@@ -84,7 +84,7 @@ def test_pre_compact_preserves_preferences_on_second_run(project_root, fixtures_
 
 def test_pre_compact_invalid_stdin_fails_soft(project_root):
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input="not json",
         capture_output=True,
         text=True,
@@ -118,7 +118,7 @@ def test_pre_compact_on_real_cli_format(project_root, fixtures_dir):
         "trigger": "auto",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
     )
     assert result.returncode == 0, result.stderr
@@ -144,7 +144,7 @@ def test_pre_compact_skips_compact_slash_command(project_root, tmp_path):
         "trigger": "auto",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
     )
     assert result.returncode == 0, result.stderr
@@ -176,7 +176,7 @@ def test_pre_compact_extracts_args_from_slash_command(project_root, tmp_path):
         "trigger": "auto",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
     )
     assert result.returncode == 0, result.stderr
@@ -206,7 +206,7 @@ def test_pre_compact_skips_tool_result_user_messages(project_root, tmp_path):
         "trigger": "auto",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
     )
     assert result.returncode == 0, result.stderr
@@ -236,7 +236,7 @@ def test_pre_compact_skips_local_command_stdout_user_messages(project_root, tmp_
         "trigger": "auto",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "pre_compact.py")],
+        [sys.executable, str(REPO / "cc_compact" / "pre_compact.py")],
         input=json.dumps(payload), capture_output=True, text=True, cwd=project_root,
     )
     assert result.returncode == 0, result.stderr
@@ -256,7 +256,7 @@ def test_pre_compact_skips_local_command_stdout_user_messages(project_root, tmp_
 def test_pre_compact_error_trace_has_session_id(project_root, fixtures_dir):
     """Regression: when main() raises AFTER the payload is parsed, the error
     trace must correlate with the real session_id (not null)."""
-    hook = REPO / "claude_smart_compact" / "pre_compact.py"
+    hook = REPO / "cc_compact" / "pre_compact.py"
     # Patch memory.memory_path (called by main() only, NOT by the error handler)
     # to force main() to raise after the payload is parsed.
     wrapper = (

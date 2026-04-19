@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from claude_smart_compact.lib import core
-from claude_smart_compact.lib.transcript import Message, TodoItem
+from cc_compact.lib import core
+from cc_compact.lib.transcript import Message, TodoItem
 
 
 def _msg(role, content, idx):

@@ -1,4 +1,4 @@
-"""Command-line entry for installing claude-smart-compact hooks into a project."""
+"""Command-line entry for installing cc-compact hooks into a project."""
 from __future__ import annotations
 
 import argparse
@@ -229,7 +229,7 @@ def install(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="claude-smart-compact",
+        prog="cc-compact",
         description="Install Claude Code smart-compact hooks into a project.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")

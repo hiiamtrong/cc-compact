@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from claude_smart_compact import cli
+from cc_compact import cli
 
 
 # ============== Symlink mode (default) tests ==============
@@ -27,8 +27,8 @@ def test_install_symlinks_resolve_to_installed_package(tmp_path):
     cli.install(tmp_path, force=False)
     link = tmp_path / ".claude/hooks/pre_compact.py"
     resolved = link.resolve()
-    # resolved path should contain "claude_smart_compact" (either from site-packages or editable install)
-    assert "claude_smart_compact" in str(resolved)
+    # resolved path should contain "cc_compact" (either from site-packages or editable install)
+    assert "cc_compact" in str(resolved)
     assert resolved.name == "pre_compact.py"
 
 
@@ -220,7 +220,7 @@ def test_install_invalid_existing_settings_errors_without_writing(tmp_path, caps
 # ============== Package re-export ==============
 
 def test_install_importable_from_package_root():
-    from claude_smart_compact import install as pkg_install
+    from cc_compact import install as pkg_install
     assert callable(pkg_install)
     assert pkg_install is cli.install
 

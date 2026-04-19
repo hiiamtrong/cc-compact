@@ -11,7 +11,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 def _run(payload: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "user_prompt.py")],
+        [sys.executable, str(REPO / "cc_compact" / "user_prompt.py")],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
@@ -69,7 +69,7 @@ def test_user_prompt_trace_records_pointer_injected(project_root):
 
 def test_user_prompt_invalid_stdin_fails_soft(project_root):
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "user_prompt.py")],
+        [sys.executable, str(REPO / "cc_compact" / "user_prompt.py")],
         input="garbage",
         capture_output=True,
         text=True,
@@ -82,7 +82,7 @@ def test_user_prompt_invalid_stdin_fails_soft(project_root):
 def test_user_prompt_error_trace_has_session_id(project_root):
     """Regression: when main() raises AFTER the payload is parsed, the error
     trace must correlate with the real session_id (not null)."""
-    hook = REPO / "claude_smart_compact" / "user_prompt.py"
+    hook = REPO / "cc_compact" / "user_prompt.py"
     # Patch memory.memory_path (called by main() only, NOT by the error handler)
     # to force main() to raise after the payload is parsed.
     wrapper = (
@@ -124,7 +124,7 @@ def test_user_prompt_creates_claude_dir_if_missing(tmp_path):
         "prompt": "hi",
     }
     result = subprocess.run(
-        [sys.executable, str(REPO / "claude_smart_compact" / "user_prompt.py")],
+        [sys.executable, str(REPO / "cc_compact" / "user_prompt.py")],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
