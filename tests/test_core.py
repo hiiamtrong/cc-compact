@@ -248,6 +248,45 @@ def test_render_in_flight_no_truncation_marker_when_under_cap():
     assert "older in-flight turns trimmed" not in rendered
 
 
+def test_render_in_flight_collapses_duplicate_bullets():
+    """Identical bullets (text or tool_use) collapse into one line tagged ×N."""
+    msgs = [_msg("assistant", "Reading file contents", i) for i in range(5)]
+    rendered = core._render_in_flight(msgs)
+    # Single bullet with count, not five separate lines.
+    assert rendered.count("Reading file contents") == 1
+    assert "(×5)" in rendered
+
+
+def test_render_in_flight_preserves_first_occurrence_order_after_dedup():
+    msgs = [
+        _msg("assistant", "A", 0),
+        _msg("assistant", "B", 1),
+        _msg("assistant", "A", 2),
+        _msg("assistant", "C", 3),
+        _msg("assistant", "B", 4),
+    ]
+    rendered = core._render_in_flight(msgs)
+    a_pos = rendered.index("- A")
+    b_pos = rendered.index("- B")
+    c_pos = rendered.index("- C")
+    assert a_pos < b_pos < c_pos
+    assert "- A (×2)" in rendered
+    assert "- B (×2)" in rendered
+    assert "- C" in rendered and "C (×" not in rendered
+
+
+def test_render_in_flight_trim_note_mentions_raw_turn_count_when_deduped():
+    """When dedup + trim both fire, the note should surface the raw turn count."""
+    # 40 unique bullets + 20 copies of one of them → 60 raw turns, 40 unique.
+    msgs = [_msg("assistant", f"turn {i}", i) for i in range(40)]
+    msgs += [_msg("assistant", "turn 0", 100 + i) for i in range(20)]
+    rendered = core._render_in_flight(msgs)
+    lines = rendered.split("\n")
+    # 40 unique > MAX_IN_FLIGHT (30) → trimmed_count = 10, and dedup happened.
+    assert "collapsed from 60 turns" in lines[0]
+    assert "10 older in-flight bullets trimmed" in lines[0]
+
+
 def test_render_in_flight_keeps_slash_command_with_args():
     """Slash commands WITH args carry task intent — keep them in bullets."""
     m = Message(

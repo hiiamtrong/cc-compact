@@ -43,6 +43,24 @@ def _truncate(s: str, limit: int) -> str:
     return s if len(s) <= limit else s[: limit - 1] + "…"
 
 
+def _collapse_duplicates(bullets: list[str]) -> list[str]:
+    """Merge repeated bullets; tag the first occurrence with ` (×N)` when N>1.
+
+    Order of first occurrence is preserved so the timeline still reads
+    forward. Used to cut the noise when an agent loops through many
+    identical-looking turns (e.g. 3000× "Reading file contents …").
+    """
+    counts: dict[str, int] = {}
+    order: list[str] = []
+    for b in bullets:
+        if b in counts:
+            counts[b] += 1
+        else:
+            counts[b] = 1
+            order.append(b)
+    return [b if counts[b] == 1 else f"{b} (×{counts[b]})" for b in order]
+
+
 def _render_in_flight(in_flight: list[Message]) -> str:
     bullets: list[str] = []
     for msg in in_flight:
@@ -63,12 +81,18 @@ def _render_in_flight(in_flight: list[Message]) -> str:
                 label = f"tool: {name} ({sig})" if sig else f"tool: {name}"
                 bullets.append(f"- {_truncate(label, MAX_BULLET_LEN)}")
                 break
+    raw_turn_count = len(bullets)
+    bullets = _collapse_duplicates(bullets)
     if len(bullets) > MAX_IN_FLIGHT:
         trimmed_count = len(bullets) - MAX_IN_FLIGHT
-        bullets = [
-            f"- _(… {trimmed_count} older in-flight turns trimmed)_",
-            *bullets[-MAX_IN_FLIGHT:],
-        ]
+        if raw_turn_count > len(bullets):
+            note = (
+                f"- _(… {trimmed_count} older in-flight bullets trimmed; "
+                f"collapsed from {raw_turn_count} turns)_"
+            )
+        else:
+            note = f"- _(… {trimmed_count} older in-flight turns trimmed)_"
+        bullets = [note, *bullets[-MAX_IN_FLIGHT:]]
     return "\n".join(bullets) if bullets else "_(no in-flight turns)_"
 
 
