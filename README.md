@@ -18,7 +18,17 @@ user preferences across auto-compaction, without bloating the context window.
 
 ## Install
 
-From PyPI:
+### Option A — Claude Code plugin (recommended)
+
+```bash
+/plugin install cc-compact@hiiamtrong/cc-compact
+```
+
+Ships `.claude-plugin/plugin.json` + `hooks/hooks.json` so Claude Code wires
+both hooks with zero edits to your `settings.json`. The plugin version takes
+precedence when loaded — no `pip install` needed.
+
+### Option B — PyPI (legacy)
 
 ```bash
 pip install cc-compact
