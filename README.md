@@ -20,13 +20,15 @@ user preferences across auto-compaction, without bloating the context window.
 
 ### Option A — Claude Code plugin (recommended)
 
-```bash
-/plugin install cc-compact@hiiamtrong/cc-compact
+Inside Claude Code, register the marketplace then install the plugin:
+
+```text
+/plugin marketplace add hiiamtrong/cc-compact
+/plugin install cc-compact@cc-compact
 ```
 
 Ships `.claude-plugin/plugin.json` + `hooks/hooks.json` so Claude Code wires
-both hooks with zero edits to your `settings.json`. The plugin version takes
-precedence when loaded — no `pip install` needed.
+both hooks with zero edits to your `settings.json`. No `pip install` needed.
 
 ### Option B — PyPI (legacy)
 
