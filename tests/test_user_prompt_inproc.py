@@ -7,6 +7,7 @@ import json
 import pytest
 
 from cc_compact import user_prompt
+from cc_compact.lib import memory as mem_lib
 
 
 def test_main_noop_when_no_memory(project_root, monkeypatch, capsys):
@@ -14,7 +15,7 @@ def test_main_noop_when_no_memory(project_root, monkeypatch, capsys):
     user_prompt.main({"session_id": "sid-none"})
     assert json.loads(capsys.readouterr().out) == {}
     # No trace written either — hook exits before safe_trace.
-    assert not (project_root / ".claude/compact-memory/sid-none.trace.jsonl").exists()
+    assert mem_lib.trace_path(project_root, "sid-none").exists() is False
 
 
 def test_main_injects_pointer_when_memory_exists(project_root, monkeypatch, capsys):
@@ -30,7 +31,7 @@ def test_main_injects_pointer_when_memory_exists(project_root, monkeypatch, caps
     ctx = out["hookSpecificOutput"]["additionalContext"]
     assert "2026-04-22T10-00-00Z_sid-1.md" in ctx
 
-    event = json.loads((mem_dir / "sid-1.trace.jsonl").read_text().strip())
+    event = json.loads(mem_lib.trace_path(project_root, "sid-1").read_text().strip())
     assert event["pointer_injected"] is True
     assert event["memory_bytes"] == 1024
 

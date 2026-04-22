@@ -53,18 +53,16 @@ def test_find_memory_path_returns_latest_when_multiple(project_root):
     assert memory.find_memory_path(project_root, "sid-z") == new
 
 
-def test_find_memory_path_falls_back_to_legacy(project_root):
+def test_trace_path_has_datetime_prefix(project_root):
+    path = memory.trace_path(project_root, "sid-x")
+    assert path.name.endswith("_sid-x.trace.jsonl")
+
+
+def test_trace_path_finds_existing(project_root):
     d = memory.memory_dir(project_root)
-    legacy = d / "sid-legacy.md"
-    legacy.write_text("legacy")
-    assert memory.find_memory_path(project_root, "sid-legacy") == legacy
-
-
-def test_trace_path(project_root):
-    assert (
-        memory.trace_path(project_root, "sid-x")
-        == project_root / ".claude" / "compact-memory" / "sid-x.trace.jsonl"
-    )
+    f = d / "2026-04-22T10-00-00Z_sid-trace.trace.jsonl"
+    f.write_text('{"hook":"test"}\n')
+    assert memory.trace_path(project_root, "sid-trace") == f
 
 
 import json

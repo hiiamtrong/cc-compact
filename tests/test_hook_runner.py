@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from cc_compact.lib import hook_runner
+from cc_compact.lib import memory as mem_lib
 
 
 def _set_stdin(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
@@ -55,7 +56,7 @@ def test_run_hook_soft_fails_on_payload_exception_and_traces(project_root, monke
     assert exc.value.code == 0
     assert json.loads(capsys.readouterr().out) == {}
 
-    trace = project_root / ".claude" / "compact-memory" / "sid-boom.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, "sid-boom")
     assert trace.exists()
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["hook"] == "TestHook"

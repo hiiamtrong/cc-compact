@@ -42,7 +42,7 @@ def test_pre_compact_happy_path(project_root, fixtures_dir):
     assert "## Open Todos" in content
     assert "add tests" in content
 
-    trace = project_root / ".claude" / "compact-memory" / "sid-happy.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, "sid-happy")
     lines = trace.read_text().strip().splitlines()
     assert len(lines) == 1
     event = json.loads(lines[0])
@@ -284,7 +284,7 @@ def test_pre_compact_error_trace_has_session_id(project_root, fixtures_dir):
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {}
-    trace = project_root / ".claude" / "compact-memory" / "sid-err.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, "sid-err")
     assert trace.exists(), "error trace must be written under the real session_id"
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["hook"] == "PreCompact"
@@ -306,6 +306,6 @@ def test_pre_compact_trace_records_preserved_preferences_flag(project_root, fixt
     }
     result = _run_hook("pre_compact.py", payload, project_root)
     assert result.returncode == 0, result.stderr
-    trace_lines = (mem_dir / "sid-p.trace.jsonl").read_text().strip().splitlines()
+    trace_lines = mem_lib.trace_path(project_root, "sid-p").read_text().strip().splitlines()
     event = json.loads(trace_lines[0])
     assert event["preserved_preferences"] is True

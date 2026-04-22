@@ -33,7 +33,7 @@ def test_main_writes_memory_and_traces(project_root, fixtures_dir, monkeypatch, 
     assert "## Active Task" in body
     assert "## Open Todos" in body
 
-    trace = project_root / ".claude" / "compact-memory" / "sid-inproc.trace.jsonl"
+    trace = memory.trace_path(project_root, "sid-inproc")
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["hook"] == "PreCompact"
     assert event["trigger"] == "auto"
@@ -52,7 +52,7 @@ def test_main_skips_write_when_no_user_message(project_root, fixtures_dir, monke
     assert json.loads(capsys.readouterr().out) == {}
     assert memory.find_memory_path(project_root, "sid-empty") is None
 
-    trace = project_root / ".claude" / "compact-memory" / "sid-empty.trace.jsonl"
+    trace = memory.trace_path(project_root, "sid-empty")
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["skipped_reason"] == "no user message"
     assert event["last_user_index"] is None

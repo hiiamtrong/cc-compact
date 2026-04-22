@@ -219,7 +219,7 @@ def test_compact_on_simulated_1m_token_session(project_root, tmp_path):
     assert "## Preferences" in md
 
     # --- Trace record ----------------------------------------------------
-    trace = project_root / ".claude" / "compact-memory" / f"{session_id}.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, session_id)
     assert trace.exists()
     trace_events = [json.loads(ln) for ln in trace.read_text().splitlines() if ln.strip()]
     assert len(trace_events) == 1
@@ -383,7 +383,7 @@ def test_compact_twice_in_same_session_persists_across_both_rounds(project_root,
     that cross-round state (preferences, trace ledger) accumulates correctly.
     """
     session_id = "two-compact-sim"
-    trace_file = project_root / ".claude" / "compact-memory" / f"{session_id}.trace.jsonl"
+    trace_file = mem_lib.trace_path(project_root, session_id)
 
     # --- Round 1: first compact ------------------------------------------
     tx1 = tmp_path / "round1.jsonl"

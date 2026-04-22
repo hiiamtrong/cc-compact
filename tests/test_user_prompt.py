@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cc_compact.lib import memory as mem_lib
+
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -59,7 +61,7 @@ def test_user_prompt_trace_records_pointer_injected(project_root):
         "prompt": "continue",
     }
     _run(payload, project_root)
-    trace = mem_dir / "sid-2.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, "sid-2")
     assert trace.exists()
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["hook"] == "UserPromptSubmit"
@@ -108,7 +110,7 @@ def test_user_prompt_error_trace_has_session_id(project_root):
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {}
-    trace = project_root / ".claude" / "compact-memory" / "sid-err.trace.jsonl"
+    trace = mem_lib.trace_path(project_root, "sid-err")
     assert trace.exists(), "error trace must be written under the real session_id"
     event = json.loads(trace.read_text().strip().splitlines()[0])
     assert event["hook"] == "UserPromptSubmit"

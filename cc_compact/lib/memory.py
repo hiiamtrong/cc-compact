@@ -36,21 +36,21 @@ def memory_path(project_root: Path, session_id: str) -> Path:
 
 
 def find_memory_path(project_root: Path, session_id: str) -> Optional[Path]:
-    """Find an existing memory file for session_id (any timestamp prefix or legacy name)."""
+    """Find an existing memory file for session_id."""
     d = memory_dir(project_root)
-    # New format: <datetime>_<session_id>.md (sorted alphabetically = chronologically)
     matches = sorted(d.glob(f"*_{session_id}.md"))
-    if matches:
-        return matches[-1]
-    # Legacy format: <session_id>.md
-    legacy = d / f"{session_id}.md"
-    if legacy.exists():
-        return legacy
-    return None
+    return matches[-1] if matches else None
 
 
 def trace_path(project_root: Path, session_id: str) -> Path:
-    return memory_dir(project_root) / f"{session_id}.trace.jsonl"
+    """Return the trace file path — existing file if found, otherwise a new one
+    with a UTC datetime prefix."""
+    d = memory_dir(project_root)
+    matches = sorted(d.glob(f"*_{session_id}.trace.jsonl"))
+    if matches:
+        return matches[-1]
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    return d / f"{ts}_{session_id}.trace.jsonl"
 
 
 def write_atomic(path: Path, content: str) -> None:
